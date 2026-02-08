@@ -11,6 +11,7 @@ app.use(cors({
   credentials: true
 }));
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
 // Logging middleware
 app.use((req, res, next) => {
@@ -41,7 +42,7 @@ app.get('/health', (req, res) => {
   });
 });
 
-// Proxy principal a Binance API
+// Proxy principal a Binance API - SIN MODIFICAR NADA
 app.all('/binance/*', async (req, res) => {
   try {
     // Extraer el path después de /binance/
@@ -50,46 +51,61 @@ app.all('/binance/*', async (req, res) => {
     
     console.log(`🔄 Proxying to: ${binanceUrl}`);
     
-    // Configurar request a Binance
+    // Copiar TODOS los headers originales (excepto host)
+    const headers = {};
+    Object.keys(req.headers).forEach(key => {
+      // No copiar headers de infraestructura
+      if (!['host', 'connection', 'content-length'].includes(key.toLowerCase())) {
+        headers[key] = req.headers[key];
+      }
+    });
+    
+    // Configurar request a Binance - PASAR TODO TAL CUAL
     const config = {
       method: req.method,
       url: binanceUrl,
-      headers: {
-        'X-MBX-APIKEY': req.headers['x-mbx-apikey'] || ''
-      },
-      validateStatus: () => true // No rechazar por status codes
+      headers: headers,
+      validateStatus: () => true, // Aceptar cualquier status code
+      maxRedirects: 0 // No seguir redirects
     };
     
-    // Agregar query params si existen
-    if (Object.keys(req.query).length > 0) {
-      config.params = req.query;
-    }
-    
-    // Agregar body para POST/PUT/DELETE
+    // Agregar body si existe (para POST/PUT/DELETE)
     if (['POST', 'PUT', 'DELETE', 'PATCH'].includes(req.method)) {
-      config.data = req.body;
+      if (req.body && Object.keys(req.body).length > 0) {
+        config.data = req.body;
+      }
     }
     
     // Hacer la petición a Binance
     const response = await axios(config);
     
-    // Retornar la respuesta
-    res.status(response.status).json(response.data);
+    // Copiar headers de respuesta
+    Object.keys(response.headers).forEach(key => {
+      res.setHeader(key, response.headers[key]);
+    });
+    
+    // Retornar la respuesta exacta
+    res.status(response.status).send(response.data);
     
   } catch (error) {
     console.error('❌ Error en proxy:', error.message);
-    res.status(500).json({
-      error: 'Proxy error',
-      message: error.message,
-      details: error.response?.data || null
-    });
+    
+    // Si hay respuesta de Binance, retornarla
+    if (error.response) {
+      res.status(error.response.status).json(error.response.data);
+    } else {
+      res.status(500).json({
+        error: 'Proxy error',
+        message: error.message
+      });
+    }
   }
 });
 
 // Ruta principal
 app.get('/', (req, res) => {
   res.json({
-    message: '🚀 Binance Proxy Server - Railway.app',
+    message: '🚀 Binance Proxy Server - Render.com',
     endpoints: {
       health: '/health',
       myIP: '/my-ip',
@@ -97,9 +113,10 @@ app.get('/', (req, res) => {
     },
     examples: {
       getPrice: '/binance/api/v3/ticker/price?symbol=BTCUSDT',
-      getTime: '/binance/api/v3/time'
+      getTime: '/binance/api/v3/time',
+      getAccount: '/binance/api/v3/account?timestamp=XXX&signature=XXX (con headers X-MBX-APIKEY)'
     },
-    instructions: '1. Llama a /my-ip para obtener tu IP fija\n2. Agrega esa IP en Binance whitelist\n3. Usa /binance/* para proxear tus requests'
+    note: 'Este proxy NO modifica las requests. Pasa todo tal cual a Binance.'
   });
 });
 
@@ -109,14 +126,20 @@ app.listen(PORT, '0.0.0.0', () => {
 ╔═══════════════════════════════════════════════╗
 ║  🚀 Binance Proxy Server                      ║
 ║  📡 Port: ${PORT}                                 ║
-║  🌐 Environment: ${process.env.RAILWAY_ENVIRONMENT || 'local'} ║
+║  🌐 Platform: Render.com                      ║
+║  🔒 Mode: Transparent Proxy (no modifications)║
 ╚═══════════════════════════════════════════════╝
   `);
   console.log('✅ Server is running!');
   console.log('🔗 Call /my-ip to get your fixed IP address');
+  console.log('⚠️  This proxy does NOT add or modify any parameters');
 });
 
 // Manejo de errores no capturados
 process.on('unhandledRejection', (reason, promise) => {
   console.error('❌ Unhandled Rejection at:', promise, 'reason:', reason);
+});
+
+process.on('uncaughtException', (error) => {
+  console.error('❌ Uncaught Exception:', error);
 });
