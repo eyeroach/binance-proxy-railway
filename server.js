@@ -19,13 +19,37 @@ app.use((req, res, next) => {
   next();
 });
 
+// Helper function para limpiar headers que revelan IP original
+function cleanHeaders(reqHeaders) {
+  const headers = {};
+  const excludedHeaders = [
+    'host', 
+    'connection', 
+    'content-length',
+    'x-forwarded-for',      // ⚠️ CRÍTICO: Binance Futures lee este header
+    'x-real-ip',            // Algunos proxies usan este
+    'x-forwarded-host',
+    'x-forwarded-proto',
+    'x-forwarded-port',
+    'forwarded'
+  ];
+  
+  Object.keys(reqHeaders).forEach(key => {
+    if (!excludedHeaders.includes(key.toLowerCase())) {
+      headers[key] = reqHeaders[key];
+    }
+  });
+  
+  return headers;
+}
+
 // Endpoint para obtener la IP fija del servidor
 app.get('/my-ip', async (req, res) => {
   try {
     const response = await axios.get('https://api.ipify.org?format=json');
     res.json({ 
       serverIP: response.data.ip,
-      message: '⭐ USA ESTA IP EN BINANCE/BYBIT/OTROS EXCHANGES WHITELIST ⭐',
+      message: '⭐ USA ESTA IP EN TODOS LOS EXCHANGES WHITELIST ⭐',
       instructions: 'Agrega esta IP en API Management de cada exchange'
     });
   } catch (error) {
@@ -52,12 +76,7 @@ app.all('/binance/*', async (req, res) => {
     
     console.log(`🔄 Proxying to Binance Spot: ${binanceUrl}`);
     
-    const headers = {};
-    Object.keys(req.headers).forEach(key => {
-      if (!['host', 'connection', 'content-length'].includes(key.toLowerCase())) {
-        headers[key] = req.headers[key];
-      }
-    });
+    const headers = cleanHeaders(req.headers);
     
     const config = {
       method: req.method,
@@ -96,6 +115,7 @@ app.all('/binance/*', async (req, res) => {
 });
 
 // Proxy para BINANCE FUTURES API (fapi.binance.com)
+// ⚠️ CRÍTICO: Limpia X-Forwarded-For para que Binance vea solo la IP del proxy
 app.all('/binance-futures/*', async (req, res) => {
   try {
     const binanceFuturesPath = req.url.replace('/binance-futures/', '');
@@ -103,12 +123,7 @@ app.all('/binance-futures/*', async (req, res) => {
     
     console.log(`🔄 Proxying to Binance Futures: ${binanceFuturesUrl}`);
     
-    const headers = {};
-    Object.keys(req.headers).forEach(key => {
-      if (!['host', 'connection', 'content-length'].includes(key.toLowerCase())) {
-        headers[key] = req.headers[key];
-      }
-    });
+    const headers = cleanHeaders(req.headers);
     
     const config = {
       method: req.method,
@@ -149,7 +164,6 @@ app.all('/binance-futures/*', async (req, res) => {
 // ==================== BYBIT ====================
 
 // Proxy para BYBIT API (api.bybit.com) - Soporta SPOT y DERIVATIVES
-// Bybit V5 API unifica todo en un solo endpoint
 app.all('/bybit/*', async (req, res) => {
   try {
     const bybitPath = req.url.replace('/bybit/', '');
@@ -157,12 +171,7 @@ app.all('/bybit/*', async (req, res) => {
     
     console.log(`🔄 Proxying to Bybit (Spot/Derivatives): ${bybitUrl}`);
     
-    const headers = {};
-    Object.keys(req.headers).forEach(key => {
-      if (!['host', 'connection', 'content-length'].includes(key.toLowerCase())) {
-        headers[key] = req.headers[key];
-      }
-    });
+    const headers = cleanHeaders(req.headers);
     
     const config = {
       method: req.method,
@@ -202,8 +211,7 @@ app.all('/bybit/*', async (req, res) => {
 
 // ==================== OKX ====================
 
-// Proxy para OKX API (www.okx.com) - Soporta SPOT, SWAP (Perpetual Futures), FUTURES
-// OKX API V5 unifica todo en un solo endpoint
+// Proxy para OKX API (www.okx.com) - Soporta SPOT, SWAP, FUTURES
 app.all('/okx/*', async (req, res) => {
   try {
     const okxPath = req.url.replace('/okx/', '');
@@ -211,12 +219,7 @@ app.all('/okx/*', async (req, res) => {
     
     console.log(`🔄 Proxying to OKX (Spot/Swap/Futures): ${okxUrl}`);
     
-    const headers = {};
-    Object.keys(req.headers).forEach(key => {
-      if (!['host', 'connection', 'content-length'].includes(key.toLowerCase())) {
-        headers[key] = req.headers[key];
-      }
-    });
+    const headers = cleanHeaders(req.headers);
     
     const config = {
       method: req.method,
@@ -264,12 +267,7 @@ app.all('/kraken/*', async (req, res) => {
     
     console.log(`🔄 Proxying to Kraken Spot: ${krakenUrl}`);
     
-    const headers = {};
-    Object.keys(req.headers).forEach(key => {
-      if (!['host', 'connection', 'content-length'].includes(key.toLowerCase())) {
-        headers[key] = req.headers[key];
-      }
-    });
+    const headers = cleanHeaders(req.headers);
     
     const config = {
       method: req.method,
@@ -315,12 +313,7 @@ app.all('/kraken-futures/*', async (req, res) => {
     
     console.log(`🔄 Proxying to Kraken Futures: ${krakenFuturesUrl}`);
     
-    const headers = {};
-    Object.keys(req.headers).forEach(key => {
-      if (!['host', 'connection', 'content-length'].includes(key.toLowerCase())) {
-        headers[key] = req.headers[key];
-      }
-    });
+    const headers = cleanHeaders(req.headers);
     
     const config = {
       method: req.method,
@@ -368,12 +361,7 @@ app.all('/kucoin/*', async (req, res) => {
     
     console.log(`🔄 Proxying to KuCoin Spot: ${kucoinUrl}`);
     
-    const headers = {};
-    Object.keys(req.headers).forEach(key => {
-      if (!['host', 'connection', 'content-length'].includes(key.toLowerCase())) {
-        headers[key] = req.headers[key];
-      }
-    });
+    const headers = cleanHeaders(req.headers);
     
     const config = {
       method: req.method,
@@ -419,12 +407,7 @@ app.all('/kucoin-futures/*', async (req, res) => {
     
     console.log(`🔄 Proxying to KuCoin Futures: ${kucoinFuturesUrl}`);
     
-    const headers = {};
-    Object.keys(req.headers).forEach(key => {
-      if (!['host', 'connection', 'content-length'].includes(key.toLowerCase())) {
-        headers[key] = req.headers[key];
-      }
-    });
+    const headers = cleanHeaders(req.headers);
     
     const config = {
       method: req.method,
@@ -470,6 +453,8 @@ app.get('/', (req, res) => {
     message: '🚀 Multi-Exchange Proxy Server (Spot + Futures) - Render.com',
     serverIP: 'Llama a /my-ip para obtener tu IP fija europea',
     
+    security: '⚠️ Headers X-Forwarded-For y X-Real-IP eliminados - Solo la IP del proxy es visible',
+    
     exchanges: {
       binance: {
         spot: {
@@ -500,8 +485,7 @@ app.get('/', (req, res) => {
           target: 'www.okx.com',
           note: 'API V5 unifica todo. Usa instType=SPOT|SWAP|FUTURES',
           exampleSpot: '/okx/api/v5/market/ticker?instId=BTC-USDT',
-          exampleSwap: '/okx/api/v5/market/ticker?instId=BTC-USDT-SWAP',
-          exampleFutures: '/okx/api/v5/market/ticker?instId=BTC-USDT-240329'
+          exampleSwap: '/okx/api/v5/market/ticker?instId=BTC-USDT-SWAP'
         }
       },
       
@@ -541,10 +525,8 @@ app.get('/', (req, res) => {
       step1: 'Obtén tu IP fija llamando a /my-ip',
       step2: 'Agrega esa IP en cada exchange (API Management → IP Whitelist)',
       step3: 'Reemplaza las URLs directas del exchange por este proxy',
-      step4: 'Mantén todos los headers, params y signatures sin cambios'
-    },
-    
-    note: 'Este proxy NO modifica las requests. Actúa como proxy transparente pasando todo tal cual.'
+      step4: 'El proxy elimina X-Forwarded-For para que solo se vea su IP'
+    }
   });
 });
 
@@ -555,7 +537,7 @@ app.listen(PORT, '0.0.0.0', () => {
 ║  🚀 Multi-Exchange Proxy Server (Spot + Futures)      ║
 ║  📡 Port: ${PORT}                                         ║
 ║  🌐 Platform: Render.com (Europa)                     ║
-║  🔒 Mode: Transparent Proxy                           ║
+║  🔒 Security: X-Forwarded-For headers removed         ║
 ║                                                       ║
 ║  Exchanges & Productos:                               ║
 ║  • Binance: Spot + Futures                            ║
@@ -567,7 +549,7 @@ app.listen(PORT, '0.0.0.0', () => {
   `);
   console.log('✅ Server is running!');
   console.log('🔗 Call /my-ip to get your fixed IP address');
-  console.log('⚠️  This proxy does NOT modify requests - transparent pass-through');
+  console.log('⚠️  X-Forwarded-For headers removed - only proxy IP visible to exchanges');
 });
 
 // Manejo de errores no capturados
